@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Delivery Time Predictor</title>
+    <meta name="description" content="Predict food delivery times using our advanced Machine Learning model.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <header class="hero">
+            <div class="badge">🚀 v1.0 Powered by Scikit-Learn</div>
+            <h1>Predict <span class="gradient-text">Delivery Times</span> with AI</h1>
+            <p>Our machine learning model analyzes distance, traffic, and weather conditions in real-time to provide highly accurate delivery estimates.</p>
+        </header>
+
+        <section class="dashboard">
+            <div class="glass-card form-container">
+                <h2>New Prediction</h2>
+                <form id="prediction-form">
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="distance">Distance (km)</label>
+                            <input type="number" id="distance" name="distance" step="0.01" min="0" placeholder="e.g. 5.5" required>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="weather">Weather Condition</label>
+                            <div class="select-wrapper">
+                                <select id="weather" name="weather" required>
+                                    <option value="" disabled selected>Select weather...</option>
+                                    <option value="Clear">Clear</option>
+                                    <option value="Windy">Windy</option>
+                                    <option value="Foggy">Foggy</option>
+                                    <option value="Rainy">Rainy</option>
+                                    <option value="Snowy">Snowy</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="traffic">Traffic Level</label>
+                            <div class="select-wrapper">
+                                <select id="traffic" name="traffic" required>
+                                    <option value="" disabled selected>Select traffic...</option>
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="time_of_day">Time of Day</label>
+                            <div class="select-wrapper">
+                                <select id="time_of_day" name="time_of_day" required>
+                                    <option value="" disabled selected>Select time...</option>
+                                    <option value="Morning">Morning</option>
+                                    <option value="Afternoon">Afternoon</option>
+                                    <option value="Evening">Evening</option>
+                                    <option value="Night">Night</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="vehicle">Vehicle Type</label>
+                            <div class="select-wrapper">
+                                <select id="vehicle" name="vehicle" required>
+                                    <option value="" disabled selected>Select vehicle...</option>
+                                    <option value="Scooter">Scooter</option>
+                                    <option value="Bike">Bike</option>
+                                    <option value="Car">Car</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="prep_time">Prep Time (min)</label>
+                            <input type="number" id="prep_time" name="prep_time" min="0" placeholder="e.g. 15" required>
+                        </div>
+
+                        <div class="input-group full-width">
+                            <label for="experience">Courier Experience (Years)</label>
+                            <input type="number" id="experience" name="experience" min="0" step="0.5" placeholder="e.g. 2" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="primary-btn" id="submit-btn">
+                        <span class="btn-text">Generate Prediction</span>
+                        <div class="spinner hidden"></div>
+                    </button>
+                </form>
+            </div>
+
+            <div class="result-container">
+                <div class="glass-card result-card hidden" id="result-card">
+                    <div class="result-header">
+                        <div class="status-indicator"></div>
+                        <h3>AI Estimate Complete</h3>
+                    </div>
+                    
+                    <div class="result-body">
+                        <div class="time-display">
+                            <span class="time-value" id="result-time">--</span>
+                            <span class="time-unit">Minutes</span>
+                        </div>
+                        <p class="result-subtitle">Estimated Delivery Time</p>
+                    </div>
+
+                    <div class="result-footer">
+                        <div class="confidence-meter">
+                            <div class="confidence-header">
+                                <span>Model Confidence</span>
+                                <span id="result-confidence">--%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="confidence-fill"></div>
+                            </div>
+                        </div>
+                        <p class="footer-note">Based on historical delivery patterns</p>
+                    </div>
+                </div>
+
+                <div class="empty-state" id="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <p>Enter delivery details to generate an AI prediction</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
