@@ -1,81 +1,52 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 import joblib
 import pandas as pd
 import random
 import os
 import logging
-import gzip
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Global variables for model and templates
+# Global variable for model
 model_pipeline = None
-templates = None
-
-# Set up absolute paths for Vercel
-# index.py is in /api, so ROOT_DIR is the parent directory
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model_pipeline, templates
+    global model_pipeline
     
-    # Safely load templates
-    templates_dir = os.path.join(ROOT_DIR, "templates")
+    # Load the trained model pipeline on startup to avoid import-time crashes on Vercel
     try:
-        templates = Jinja2Templates(directory=templates_dir)
-        logging.info(f"Templates loaded from: {templates_dir}")
-    except Exception as e:
-        logging.error(f"Could not load templates: {e}")
-        templates = None
-
-    # Load the trained model pipeline (compressed for Vercel size limits)
-    try:
-        model_path = os.path.join(ROOT_DIR, 'Delivery_Time.pkl.gz')
+        # Use absolute path relative to this file inside the api/ folder
+        current_dir = os.path.dirname(__file__)
+        model_path = os.path.join(current_dir, 'Delivery_Time.pkl')
+        
         if os.path.exists(model_path):
-            with gzip.open(model_path, 'rb') as f:
-                model_pipeline = joblib.load(f)
-            logging.info("Model loaded successfully from compressed file.")
+            model_pipeline = joblib.load(model_path)
+            logging.info("Model loaded successfully.")
         else:
-            # Fallback to uncompressed for local development
-            uncompressed_path = os.path.join(ROOT_DIR, 'Delivery_Time.pkl')
-            model_pipeline = joblib.load(uncompressed_path)
-            logging.info("Model loaded successfully from uncompressed file.")
+            logging.error(f"Model file not found at {model_path}")
+            model_pipeline = None
     except Exception as e:
         logging.error(f"Error loading model: {e}")
         model_pipeline = None
 
     yield
-    # Clean up on shutdown if needed
+    # Clean up on shutdown
     model_pipeline = None
 
+# Ensure FastAPI is deployed as a serverless function, not a long-running server.
 app = FastAPI(title="Delivery Time Predictor AI", lifespan=lifespan)
 
-# Safely mount static files (may fail on read-only serverless filesystem if directory missing)
-static_dir = os.path.join(ROOT_DIR, "static")
-try:
-    if os.path.isdir(static_dir):
-        app.mount("/static", StaticFiles(directory=static_dir), name="static")
-        logging.info(f"Static files mounted from: {static_dir}")
-    else:
-        logging.warning(f"Static directory not found: {static_dir}")
-except Exception as e:
-    logging.warning(f"Could not mount static files: {e}")
+@app.get("/")
+async def root_health_check():
+    return {"status": "OK"}
 
 @app.get("/health")
 async def health_check():
     return {"status": "OK"}
-
-@app.get("/", response_class=HTMLResponse)
-async def read_index(request: Request):
-    if templates is None:
-        return HTMLResponse(content="<h1>Template Error</h1><p>Templates could not be loaded.</p>", status_code=500)
-    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/predict")
 async def predict(
@@ -116,7 +87,4 @@ async def predict(
         logging.error(f"Prediction error: {e}")
         return JSONResponse(status_code=400, content={"error": str(e)})
 
-if __name__ == "__main__":
-    import uvicorn
-    # Important: when running locally, run from project root: uvicorn api.index:app --reload
-    uvicorn.run("api.index:app", host="0.0.0.0", port=8000, reload=True)
+# For local development, run: uvicorn api.index:app --reload
