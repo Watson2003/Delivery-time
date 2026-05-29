@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "api/index.py": {
-      "includeFiles": "{templates/**,static/**,Delivery_Time.pkl.gz}"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
