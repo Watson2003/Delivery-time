@@ -45,6 +45,6 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
-# Project specific (commented out, uncomment if you don't want to commit these)
-# *.csv
-# *.pkl
+# Project specific
+*.pkl
+!*.pkl.gz
