@@ -9,17 +9,20 @@ import os
 
 app = FastAPI(title="Delivery Time Predictor AI")
 
-# Create directories if they don't exist
-os.makedirs("static", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
+# Set up absolute paths for Vercel
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Create directories if they don't exist
+os.makedirs(os.path.join(BASE_DIR, "static"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "templates"), exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Load the trained model pipeline
-# We assume Delivery_Time.pkl is in the same directory as app.py
 try:
-    model_pipeline = joblib.load('Delivery_Time.pkl')
+    model_path = os.path.join(BASE_DIR, 'Delivery_Time.pkl')
+    model_pipeline = joblib.load(model_path)
     print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {e}")
