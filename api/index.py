@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
         logging.info("No templates directory found – the root endpoint will return JSON.")
 
     # ---------- load the sklearn pipeline ----------
-    model_path = locate("Delivery_Time.pkl")
+    model_path = locate("Delivery_Time.pkl.gz")
     try:
         logging.info(f"Loading model from {model_path} …")
         if model_path.endswith('.gz'):
@@ -113,7 +113,7 @@ async def root(request: Request):
     """If you have an HTML UI, render it. Otherwise return a tiny JSON health check."""
     if templates:
         try:
-            return templates.TemplateResponse("index.html", {"request": request})
+            return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
         except Exception as exc:
             logging.error(f"Template rendering error: {exc}")
             return HTMLResponse(content="<h1>Template error</h1><p>Check logs.</p>", status_code=500)
