@@ -3,6 +3,6 @@ Food_Delivery_Times.csv
 temp.py
 __pycache__/
 *.pyc
-Delivery_Time.pkl
+
 .git/
 .gitignore
