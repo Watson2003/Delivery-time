@@ -37,11 +37,19 @@ except Exception as e:
     templates = None
 
 
-# Load the trained model pipeline
+# Load the trained model pipeline (compressed for Vercel size limits)
 try:
-    model_path = os.path.join(BASE_DIR, 'Delivery_Time.pkl')
-    model_pipeline = joblib.load(model_path)
-    logging.info("Model loaded successfully.")
+    model_path = os.path.join(BASE_DIR, 'Delivery_Time.pkl.gz')
+    if os.path.exists(model_path):
+        import gzip
+        with gzip.open(model_path, 'rb') as f:
+            model_pipeline = joblib.load(f)
+        logging.info("Model loaded successfully from compressed file.")
+    else:
+        # Fallback to uncompressed for local development
+        model_path = os.path.join(BASE_DIR, 'Delivery_Time.pkl')
+        model_pipeline = joblib.load(model_path)
+        logging.info("Model loaded successfully from uncompressed file.")
 except Exception as e:
     logging.error(f"Error loading model: {e}")
     model_pipeline = None

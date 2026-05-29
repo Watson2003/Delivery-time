@@ -1,0 +1,8 @@
+# Exclude files not needed at runtime on Vercel
+Food_Delivery_Times.csv
+temp.py
+__pycache__/
+*.pyc
+Delivery_Time.pkl
+.git/
+.gitignore
