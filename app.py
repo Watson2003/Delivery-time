@@ -6,6 +6,10 @@ import joblib
 import pandas as pd
 import random
 import os
+import logging
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = FastAPI(title="Delivery Time Predictor AI")
 
@@ -23,9 +27,9 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 try:
     model_path = os.path.join(BASE_DIR, 'Delivery_Time.pkl')
     model_pipeline = joblib.load(model_path)
-    print("Model loaded successfully.")
+    logging.info("Model loaded successfully.")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    logging.error(f"Error loading model: {e}")
     model_pipeline = None
 
 @app.get("/", response_class=HTMLResponse)
@@ -79,6 +83,11 @@ async def predict(
         print(f"Prediction error: {e}")
         return JSONResponse(status_code=400, content={"error": str(e)})
 
+# Health check endpoint for monitoring
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
