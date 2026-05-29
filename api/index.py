@@ -1,118 +1,130 @@
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import joblib
-import pandas as pd
-import random
+# file:///d:/ROOT/Delivery%20time/api/index.py
 import os
 import logging
 import gzip
+import traceback
+from contextlib import asynccontextmanager
 
-# Configure basic logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+import joblib
+import pandas as pd
+import random
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-# Global variables
-model_pipeline = None
-templates = None
-model_load_error = "Unknown error"
+# ----------------------------------------------------------------------
+# Logging configuration (visible in Vercel logs)
+# ----------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
 
-# We look for templates/static either in the current api/ dir or the parent root dir
-current_dir = os.path.dirname(__file__)
-parent_dir = os.path.dirname(current_dir)
+# ----------------------------------------------------------------------
+# Helper to locate files (works whether the repo is run from the root or
+# from the api/ sub‑directory)
+# ----------------------------------------------------------------------
+CURRENT_DIR = os.path.dirname(__file__)          # .../api
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
-def find_dir(dir_name):
-    if os.path.isdir(os.path.join(current_dir, dir_name)):
-        return os.path.join(current_dir, dir_name)
-    elif os.path.isdir(os.path.join(parent_dir, dir_name)):
-        return os.path.join(parent_dir, dir_name)
-    return None
+
+def locate(path: str) -> str:
+    """Return an absolute path. Look in the api folder first, then the project root."""
+    candidate = os.path.join(CURRENT_DIR, path)
+    if os.path.exists(candidate):
+        return candidate
+    candidate = os.path.join(ROOT_DIR, path)
+    return candidate
+
+# ----------------------------------------------------------------------
+# Global objects populated at start‑up
+# ----------------------------------------------------------------------
+model_pipeline = None          # the trained scikit‑learn pipeline
+model_load_error = None        # human‑readable error if loading fails
+templates = None               # Jinja2 template engine (optional UI)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model_pipeline, templates, model_load_error
-    
-    # Load Templates
-    templates_dir = find_dir("templates")
-    if templates_dir:
+    """
+    FastAPI's lifespan event runs once when the container starts.
+    We load the model *once* here so the serverless function does not
+    re‑load the (large) pickle on every request.
+    """
+    global model_pipeline, model_load_error, templates
+
+    # ---------- load HTML templates (optional) ----------
+    tmpl_dir = locate("templates")
+    if os.path.isdir(tmpl_dir):
         try:
-            templates = Jinja2Templates(directory=templates_dir)
-            logging.info(f"Templates loaded from: {templates_dir}")
-        except Exception as e:
-            logging.error(f"Could not load templates: {e}")
+            templates = Jinja2Templates(directory=tmpl_dir)
+            logging.info(f"Templates loaded from {tmpl_dir}")
+        except Exception as exc:
+            logging.error(f"Failed to initialise Jinja2: {exc}")
             templates = None
     else:
-        logging.error("Templates directory not found!")
-        templates = None
+        logging.info("No templates directory found – the root endpoint will return JSON.")
 
-    # Load Model (supports .pkl and .pkl.gz)
+    # ---------- load the sklearn pipeline ----------
+    model_path = locate("Delivery_Time.pkl")
     try:
-        model_loaded = False
-        
-        # Check inside api/ and root for model
-        possible_paths = [
-            os.path.join(current_dir, 'Delivery_Time.pkl.gz'),
-            os.path.join(parent_dir, 'Delivery_Time.pkl.gz'),
-            os.path.join(current_dir, 'Delivery_Time.pkl'),
-            os.path.join(parent_dir, 'Delivery_Time.pkl')
-        ]
-        
-        paths_checked = []
-        for path in possible_paths:
-            paths_checked.append(path)
-            if os.path.exists(path):
-                logging.info(f"Loading model from {path}...")
-                if path.endswith('.gz'):
-                    with gzip.open(path, 'rb') as f:
-                        model_pipeline = joblib.load(f)
-                else:
-                    model_pipeline = joblib.load(path)
-                model_loaded = True
-                model_load_error = None
-                logging.info("Model loaded successfully.")
-                break
-                
-        if not model_loaded:
-            model_load_error = f"File not found. Checked: {paths_checked}"
-            logging.error(model_load_error)
-            model_pipeline = None
-    except Exception as e:
-        import traceback
-        model_load_error = f"Exception during joblib.load: {str(e)} \n Traceback: {traceback.format_exc()}"
+        logging.info(f"Loading model from {model_path} …")
+        if model_path.endswith('.gz'):
+            with gzip.open(model_path, "rb") as f:
+                model_pipeline = joblib.load(f)
+        else:
+            model_pipeline = joblib.load(model_path)
+        model_load_error = None
+        logging.info("✅ Model loaded successfully.")
+    except Exception as exc:
+        model_load_error = (
+            f"Failed to load model: {type(exc).__name__}: {exc}\n"
+            f"{traceback.format_exc()}"
+        )
         logging.error(model_load_error)
         model_pipeline = None
 
     yield
-    # Clean up on shutdown
+
+    # ------------------------------------------------------------------
+    # cleanup (the container will be discarded after the request anyway)
+    # ------------------------------------------------------------------
     model_pipeline = None
+    logging.info("FastAPI lifespan shut down – model cleared.")
 
-app = FastAPI(title="Delivery Time Predictor AI", lifespan=lifespan)
 
-# Safely mount static files
-static_dir = find_dir("static")
-if static_dir:
+app = FastAPI(title="Delivery‑Time Predictor", lifespan=lifespan)
+
+# ----------------------------------------------------------------------
+# Serve static files (if you have a `static/` folder)
+# ----------------------------------------------------------------------
+static_dir = locate("static")
+if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logging.info(f"Static files mounted from: {static_dir}")
-else:
-    logging.warning("Static directory not found!")
+    logging.info(f"Static files mounted from {static_dir}")
 
+
+# ----------------------------------------------------------------------
+# End‑points
+# ----------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
-async def read_index(request: Request):
-    """Serve the frontend UI on the root endpoint"""
-    if templates is None:
-        return HTMLResponse(content="<h1>Template Error</h1><p>Templates object is None. Check logs.</p>", status_code=500)
-    try:
-        return templates.TemplateResponse(request=request, name="index.html")
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        return HTMLResponse(content=f"<h1>Template Render Error</h1><pre>{error_details}</pre>", status_code=500)
+async def root(request: Request):
+    """If you have an HTML UI, render it. Otherwise return a tiny JSON health check."""
+    if templates:
+        try:
+            return templates.TemplateResponse("index.html", {"request": request})
+        except Exception as exc:
+            logging.error(f"Template rendering error: {exc}")
+            return HTMLResponse(content="<h1>Template error</h1><p>Check logs.</p>", status_code=500)
+    return {"status": "OK", "message": "FastAPI is alive"}
+
 
 @app.get("/health")
-async def health_check():
-    """Health check endpoint"""
+async def health():
+    """Simple liveness probe for Vercel."""
     return {"status": "OK"}
+
 
 @app.post("/predict")
 async def predict(
@@ -123,32 +135,44 @@ async def predict(
     time_of_day: str = Form(...),
     vehicle: str = Form(...),
     prep_time: float = Form(...),
-    experience: float = Form(...)
+    experience: float = Form(...),
 ):
-    if not model_pipeline:
-        return JSONResponse(status_code=500, content={"error": f"Model not loaded. Reason: {model_load_error}"})
+    """Return a delivery‑time prediction or a clear error payload."""
+    if model_pipeline is None:
+        # The start‑up loader failed – surface the stored error message.
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Model not available. {model_load_error or ''}"},
+        )
 
     try:
-        input_data = pd.DataFrame([{
-            'Distance_km': distance,
-            'Weather': weather,
-            'Traffic_Level': traffic,
-            'Time_of_Day': time_of_day,
-            'Vehicle_Type': vehicle,
-            'Preparation_Time_min': prep_time,
-            'Courier_Experience_yrs': experience
-        }])
+        # Build a single‑row DataFrame that matches the training columns
+        input_df = pd.DataFrame(
+            [
+                {
+                    "Distance_km": distance,
+                    "Weather": weather,
+                    "Traffic_Level": traffic,
+                    "Time_of_Day": time_of_day,
+                    "Vehicle_Type": vehicle,
+                    "Preparation_Time_min": prep_time,
+                    "Courier_Experience_yrs": experience,
+                }
+            ]
+        )
 
-        prediction = model_pipeline.predict(input_data)[0]
-        predicted_minutes = round(max(0, prediction))
+        prediction = model_pipeline.predict(input_df)[0]
+        minutes = round(max(0, prediction))
         confidence = round(random.uniform(85.0, 98.9), 1)
 
         return {
             "success": True,
-            "predicted_time": predicted_minutes,
-            "confidence": confidence
+            "predicted_time_min": minutes,
+            "confidence_percent": confidence,
         }
 
-    except Exception as e:
-        logging.error(f"Prediction error: {e}")
-        return JSONResponse(status_code=400, content={"error": str(e)})
+    except Exception as exc:
+        # Unexpected error – log and return a readable JSON payload.
+        err_msg = f"{type(exc).__name__}: {exc}"
+        logging.error(f"Prediction error: {err_msg}\n{traceback.format_exc()}")
+        return JSONResponse(status_code=400, content={"error": err_msg})
