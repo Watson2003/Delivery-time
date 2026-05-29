@@ -38,12 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultCard.classList.remove('hidden');
                 
                 // Animate numbers
-                animateValue(resultTime, 0, data.predicted_time, 1500);
+                animateValue(resultTime, 0, data.predicted_time_min, 1500);
                 
                 // Update confidence
                 setTimeout(() => {
-                    resultConfidence.textContent = `${data.confidence}%`;
-                    confidenceFill.style.width = `${data.confidence}%`;
+                    resultConfidence.textContent = `${data.confidence_percent}%`;
+                    confidenceFill.style.width = `${data.confidence_percent}%`;
                 }, 500);
                 
             } else {
