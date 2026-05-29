@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 # Global variables
 model_pipeline = None
 templates = None
+model_load_error = "Unknown error"
 
 # We look for templates/static either in the current api/ dir or the parent root dir
 current_dir = os.path.dirname(__file__)
@@ -30,7 +31,7 @@ def find_dir(dir_name):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model_pipeline, templates
+    global model_pipeline, templates, model_load_error
     
     # Load Templates
     templates_dir = find_dir("templates")
@@ -57,7 +58,9 @@ async def lifespan(app: FastAPI):
             os.path.join(parent_dir, 'Delivery_Time.pkl')
         ]
         
+        paths_checked = []
         for path in possible_paths:
+            paths_checked.append(path)
             if os.path.exists(path):
                 logging.info(f"Loading model from {path}...")
                 if path.endswith('.gz'):
@@ -66,14 +69,18 @@ async def lifespan(app: FastAPI):
                 else:
                     model_pipeline = joblib.load(path)
                 model_loaded = True
+                model_load_error = None
                 logging.info("Model loaded successfully.")
                 break
                 
         if not model_loaded:
-            logging.error("Model file not found in any standard location.")
+            model_load_error = f"File not found. Checked: {paths_checked}"
+            logging.error(model_load_error)
             model_pipeline = None
     except Exception as e:
-        logging.error(f"Error loading model: {e}")
+        import traceback
+        model_load_error = f"Exception during joblib.load: {str(e)} \n Traceback: {traceback.format_exc()}"
+        logging.error(model_load_error)
         model_pipeline = None
 
     yield
@@ -119,7 +126,7 @@ async def predict(
     experience: float = Form(...)
 ):
     if not model_pipeline:
-        return JSONResponse(status_code=500, content={"error": "Model not loaded."})
+        return JSONResponse(status_code=500, content={"error": f"Model not loaded. Reason: {model_load_error}"})
 
     try:
         input_data = pd.DataFrame([{
