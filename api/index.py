@@ -67,11 +67,11 @@ try:
 except Exception as e:
     logging.warning(f"Could not mount static files: {e}")
 
-@app.get("/")
+@app.get("/health")
 async def health_check():
     return {"status": "OK"}
 
-@app.get("/ui", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     if templates is None:
         return HTMLResponse(content="<h1>Template Error</h1><p>Templates could not be loaded.</p>", status_code=500)
