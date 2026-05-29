@@ -16,12 +16,26 @@ app = FastAPI(title="Delivery Time Predictor AI")
 # Set up absolute paths for Vercel
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Create directories if they don't exist
-os.makedirs(os.path.join(BASE_DIR, "static"), exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, "templates"), exist_ok=True)
+# Safely mount static files (may fail on read-only serverless filesystem)
+static_dir = os.path.join(BASE_DIR, "static")
+templates_dir = os.path.join(BASE_DIR, "templates")
 
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+try:
+    if os.path.isdir(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        logging.info(f"Static files mounted from: {static_dir}")
+    else:
+        logging.warning(f"Static directory not found: {static_dir}")
+except Exception as e:
+    logging.warning(f"Could not mount static files: {e}")
+
+try:
+    templates = Jinja2Templates(directory=templates_dir)
+    logging.info(f"Templates loaded from: {templates_dir}")
+except Exception as e:
+    logging.error(f"Could not load templates: {e}")
+    templates = None
+
 
 # Load the trained model pipeline
 try:
@@ -34,6 +48,8 @@ except Exception as e:
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
+    if templates is None:
+        return HTMLResponse(content="<h1>Template Error</h1><p>Templates could not be loaded.</p>", status_code=500)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/predict")
