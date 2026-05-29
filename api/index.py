@@ -96,7 +96,7 @@ async def read_index(request: Request):
     if templates is None:
         return HTMLResponse(content="<h1>Template Error</h1><p>Templates object is None. Check logs.</p>", status_code=500)
     try:
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request=request, name="index.html")
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
